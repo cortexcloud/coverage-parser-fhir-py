@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import hashlib
 from hashlib import sha256
-from fhir_transformer.eclaim.file_extractor import validate_rows_input_files
+
 marriage_status_dict = { 
     "1": "โสด",
     "2": "คู่",

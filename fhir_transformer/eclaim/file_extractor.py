@@ -159,50 +159,6 @@ def save_json_files(file_path,json_data):
     print('Saving Json Files..')
 def json_dump(json_data):
     return json.dumps(json_data, indent=2, ensure_ascii=False, cls=NpEncoder)
-def validate_rows_input_files(files_name,df):
-    # if files_name == 'ins':
-    #     if 'HTYPE' not in df.columns:
-    #         df['HTYPE'] = None
-    #     if 'SUBTYPE' not in df.columns:
-    #         df['SUBTYPE'] = '89'
-    # if files_name == 'ipd':
-    #     if 'DEPT' not in df.columns:
-    #         df['DEPT'] = None
-    #     if 'WARDDSC' not in df.columns:
-    #         df['WARDDSC'] = None
-    #     if 'SVCTYPE' not in df.columns:
-    #         df['SVCTYPE'] = 'IMP'
-    if files_name == 'dru':
-        if 'PROVIDER' not in df.columns:
-            df['PROVIDER'] = None
-        if 'SIGTEXT' not in df.columns:
-            df['SIGTEXT'] = None
-        if 'SIGCODE' not in df.columns:
-            df['SIGCODE'] = None
-        if 'DRUGREMARK' not in df.columns:
-            df['DRUGREMARK'] = None
-    if files_name == 'adp':
-        if 'TOTCOPAY' not in df.columns:
-            df['TOTCOPAY'] = 0
-        if 'TMLTCODE' not in df.columns:
-            df['TMLTCODE'] = None
-        if 'TOTAL' not in df.columns:
-            df['TOTAL'] = 0
-        if 'SERIALNO' not in df.columns:
-            df['SERIALNO'] = None
-        if 'GRAVIDA' not in df.columns:
-            df['GRAVIDA'] = None
-        if 'GA_WEEK' not in df.columns:
-            df['GA_WEEK'] = None
-        if 'DCIP' not in df.columns:
-            df['DCIP'] = None
-        if 'STATUS1' not in df.columns:
-            df['STATUS1'] = None
-        if 'BI' not in df.columns:
-            df['BI'] = None
-        if 'CAGCODE' not in df.columns:
-            df['CAGCODE'] = None
-    return df
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
