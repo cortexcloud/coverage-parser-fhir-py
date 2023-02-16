@@ -262,13 +262,13 @@ def create_bundle_resource_eclaim(eclaim_17_df,eclaim_17_name,h_code,h_name,os):
         # Create Encounter Resource (IPD)
         bundle_encounter_structure,bundle_account_structure,bundle_observation_bw_structure = create_encounter_resource(ipd,bundle_patient_structure,h_code)
         # Create Coverage Resource (INS)
-        bundle_coverage_structure = create_coverage_resource(ins)
+        bundle_coverage_structure = create_coverage_resource(ins,h_code)
         # Update Encounter By (INS)
         bundle_encounter_structure = update_encounter_resource_by_ins(ins,bundle_encounter_structure)
         # Update Encounter By (LVD)
         bundle_encounter_structure = update_encounter_resource_by_lvd(lvd,bundle_encounter_structure)  
         # Create Service Request Resource (IRF)
-        bundle_service_req_structure = create_service_request_resource(irf,bundle_patient_structure,bundle_encounter_structure)
+        bundle_service_req_structure = create_service_request_resource(irf,bundle_patient_structure,bundle_encounter_structure,h_code)
         # Update Encounter By (IRF)
         bundle_encounter_structure = update_encounter_resource_by_irf(irf,bundle_service_req_structure,bundle_encounter_structure)
         # Create Condition Resource
@@ -296,27 +296,27 @@ def create_bundle_resource_eclaim(eclaim_17_df,eclaim_17_name,h_code,h_name,os):
                 if len(bundle_condition_adp_structure) > 0:
                     bundle_resource.append(bundle_condition_adp_structure)
                 # Create Observation BT Resource By (ADP)
-                bundle_observation_bt_structure = create_observation_bt_resource(adp,bundle_patient_structure,bundle_encounter_structure,i)
+                bundle_observation_bt_structure = create_observation_bt_resource(adp,bundle_patient_structure,bundle_encounter_structure,i,h_code)
                 if len(bundle_observation_bt_structure) > 0:
                     bundle_resource.append(bundle_observation_bt_structure)
                 # Create Observation Covid Resource By (ADP)   
-                bundle_observation_covid_structure = create_observation_covid_resource(adp,bundle_patient_structure,bundle_encounter_structure,i)
+                bundle_observation_covid_structure = create_observation_covid_resource(adp,bundle_patient_structure,bundle_encounter_structure,i,h_code)
                 if len(bundle_observation_covid_structure) > 0:
                     bundle_resource.append(bundle_observation_covid_structure)
                 # Create Observation Dcip Resource By (ADP) 
-                bundle_observation_dcip_structure = create_observation_dcip_resource(adp,bundle_patient_structure,bundle_encounter_structure,i)
+                bundle_observation_dcip_structure = create_observation_dcip_resource(adp,bundle_patient_structure,bundle_encounter_structure,i,h_code)
                 if len(bundle_observation_dcip_structure) > 0:
                     bundle_resource.append(bundle_observation_dcip_structure)
                 # Create Observation Ga Resource By (ADP)     
-                bundle_observation_ga_structure = create_observation_ga_resource(adp,bundle_patient_structure,bundle_encounter_structure,i)
+                bundle_observation_ga_structure = create_observation_ga_resource(adp,bundle_patient_structure,bundle_encounter_structure,i,h_code)
                 if len(bundle_observation_ga_structure) > 0:
                     bundle_resource.append(bundle_observation_ga_structure)
                 # Create Observation Gravida Resource By (ADP) 
-                bundle_observation_gravida_structure = create_observation_gravida_resource(adp,bundle_patient_structure,bundle_encounter_structure,i)
+                bundle_observation_gravida_structure = create_observation_gravida_resource(adp,bundle_patient_structure,bundle_encounter_structure,i,h_code)
                 if len(bundle_observation_gravida_structure) > 0:
                     bundle_resource.append(bundle_observation_gravida_structure)
         # Create Observation Labfu
-        bundle_observation_labfu_structure = create_observation_lab_resource(labfu,bundle_patient_structure,bundle_encounter_structure)
+        bundle_observation_labfu_structure = create_observation_lab_resource(labfu,bundle_patient_structure,bundle_encounter_structure,h_code)
         if len(bundle_organization_structure) > 0:  
             bundle_resource.append(bundle_organization_structure)
         if len(bundle_encounter_structure) > 0:  
@@ -364,13 +364,13 @@ def filter_visit_an(df,an):
   else:
     return df
 
-def create_coverage_resource(ins):
+def create_coverage_resource(ins,h_code):
     # init bundle resource
     bundle_coverage_structure = dict()
     if ins.shape[0] != 0:
       coverage_resource = {
           "resourceType" : "Coverage",
-          "id": "uccid" + str(ins.iloc[0]['CID']),
+          "id": f"hcode-{h_code}-uc-cid-{ins.iloc[0]['CID']}",
           "status": "active",
           "payor":[
             {
@@ -494,7 +494,7 @@ def create_patient_resource(pat,h_code):
     if pat.shape[0] != 0:
       patient_resource = {
         "resourceType" : "Patient",
-        "id": "cid" + str(pat.iloc[0]['PERSON_ID'])
+        "id": "cid-" + str(pat.iloc[0]['PERSON_ID'])
       }
       if pat.iloc[0]['NATION'] is not None and len(str(pat.iloc[0]['NATION'])) > 0:
           patient_resource["extension"] = [
@@ -626,7 +626,7 @@ def create_patient_resource(pat,h_code):
               }
       }
       if pat.iloc[0]['OCCUPA'] is not None and len(str(pat.iloc[0]['OCCUPA'])) > 0:
-          observation_id = str(uuid.uuid4())
+          observation_id = f"hcode-{h_code}-occup-cid-{pat.iloc[0]['PERSON_ID']}"
           observation_resource = {
                 "resourceType": "Observation",
                 "id": observation_id,
@@ -688,7 +688,7 @@ def create_patient_resource(pat,h_code):
 def create_organization_resource(h_name,h_code):
     bundle_organization_structure = dict()
     if len(str(h_code)) > 1:
-      hcode_id = "hcode" + str(h_code)
+      hcode_id = f"hcode-{h_code}"
       bundle_organization_structure = {
               "fullUrl": f"Organization/{hcode_id}",
               "resource": {
@@ -717,7 +717,7 @@ def create_encounter_resource(ipd,bundle_patient_structure,h_code):
     if ipd.shape[0] != 0:
       if 'resource' in bundle_patient_structure:
           patient_resource = bundle_patient_structure['resource']
-      account_id = str(uuid.uuid4())
+      account_id = f"hcode-{h_code}-an-{ipd.iloc[0]['AN']}"
       account_resource = {
         "resourceType": "Account",
         "id": account_id,
@@ -765,7 +765,7 @@ def create_encounter_resource(ipd,bundle_patient_structure,h_code):
           account_resource["servicePeriod"]["end"] = service_period_out
       encounter_resource = {
           "resourceType" : "Encounter",
-          "id": "an" + str(ipd.iloc[0]['AN']),
+          "id": f"hcode-{h_code}-an-{ipd.iloc[0]['AN']}",
           "status" : "finished"
       }
       if ipd.iloc[0]['AN'] is not None and len(str(ipd.iloc[0]['AN'])) > 0:
@@ -883,7 +883,7 @@ def create_encounter_resource(ipd,bundle_patient_structure,h_code):
                   }
                 }
               })
-      observation_bw_id = str(uuid.uuid4())
+      observation_bw_id = f"hcode-{h_code}-bw-{patient_resource['id']}"
       observation_bw_resource = {
           "resourceType": "Observation",
           "id": observation_bw_id,
@@ -972,7 +972,7 @@ def create_encounter_resource(ipd,bundle_patient_structure,h_code):
               }
       }
     return bundle_encounter_structure,bundle_account_structure,bundle_observation_bw_structure
-def create_service_request_resource(irf,patient_bundle,encounter_bundle):
+def create_service_request_resource(irf,patient_bundle,encounter_bundle,h_code):
     bundle_service_req_structure = dict()
     encounter_resource = dict()
     patient_resource = dict()
@@ -982,7 +982,7 @@ def create_service_request_resource(irf,patient_bundle,encounter_bundle):
         patient_resource = patient_bundle['resource']
     if irf.shape[0] != 0:
       if irf[irf['REFERTYPE']=='2'].shape[0] > 0:
-          service_id = str(uuid.uuid4())
+          service_id = encounter_resource['id']
           refer_out = irf[irf['REFERTYPE']=='2']
           service_req_resource = {
               "resourceType" : "ServiceRequest",
@@ -1037,7 +1037,7 @@ def create_condition_resource(idx,aer,patient_bundle,encounter_bundle):
         patient_resource = patient_bundle['resource']
     if idx.shape[0] != 0:
       for i in range(idx.shape[0]):
-        condition_id = str(uuid.uuid4())
+        condition_id = f"{encounter_resource['id']}-code-idx-{idx['DIAG'][i]}"
         condition_resource = {
             "resourceType" : "Condition",
             "id": condition_id,
@@ -1108,7 +1108,7 @@ def create_procedure_resource(iop,patient_bundle,encounter_bundle):
         patient_resource = patient_bundle['resource']
     if iop.shape[0] != 0:
       for i in range(iop.shape[0]):
-        procedure_id = str(uuid.uuid4())
+        procedure_id = f"{encounter_resource['id']}-code-{iop['OPER'][i]}"
         procedure_resource = {
             "resourceType" : "Procedure",
             "id": procedure_id,
@@ -1187,7 +1187,7 @@ def create_medication_dispense_resource(dru,patient_bundle,encounter_bundle):
         patient_resource = patient_bundle['resource']
     if dru.shape[0] != 0:
         for i in range(dru.shape[0]):
-          med_dispense_id = str(uuid.uuid4())
+          med_dispense_id = f"{encounter_resource['id']}-code-{dru['DID'][i]}"
           med_dispense_resource = {
               "resourceType" : "MedicationDispense",
               "id" : med_dispense_id,
@@ -1295,7 +1295,7 @@ def create_medication_request_resource(dru,patient_bundle,encounter_bundle):
         patient_resource = patient_bundle['resource']
     if dru.shape[0] != 0:
         for i in range(dru.shape[0]):
-          med_request_id = str(uuid.uuid4())
+          med_request_id = f"{encounter_resource['id']}-code-{dru['DID'][i]}"
           med_request_resource = {
             "resourceType": "MedicationRequest",
             "id": med_request_id,
@@ -1572,7 +1572,7 @@ def create_claim_resource(cha,claim_items,patient_bundle,encounter_bundle,hcode_
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if len(claim_items) > 0:
-      claim_id = str(uuid.uuid4())
+      claim_id = f"{encounter_resource['id']}"
       claim_resource = {
         "resourceType": "Claim",
         "id": claim_id,
@@ -1637,7 +1637,7 @@ def create_condition_resource_by_adp(adp,patient_bundle,encounter_bundle,i):
         encounter_resource = encounter_bundle['resource']
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
-    condition_id = str(uuid.uuid4())
+    condition_id = f"{encounter_resource['id']}-code-adp-{adp['CODE'][i]}"
     condition_adp_resource = {
       "resourceType": "Condition",
       "id": condition_id,
@@ -1691,7 +1691,7 @@ def create_condition_resource_by_adp(adp,patient_bundle,encounter_bundle,i):
               }
       }
     return bundle_condition_adp_structure
-def create_observation_bt_resource(adp,patient_bundle,encounter_bundle,i):
+def create_observation_bt_resource(adp,patient_bundle,encounter_bundle,i,h_code):
     bundle_observation_bt_structure = dict()
     encounter_resource = dict()
     patient_resource = dict()
@@ -1700,7 +1700,7 @@ def create_observation_bt_resource(adp,patient_bundle,encounter_bundle,i):
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if adp['BI'][i] is not None and len(adp['BI'][i]) > 1:
-        observation_barthel_id = str(uuid.uuid4())
+        observation_barthel_id = f"hcode-{h_code}-bt-{patient_resource['id']}"
         observation_barthel_resource = {
           "resourceType": "Observation",
           "id": observation_barthel_id,
@@ -1759,7 +1759,7 @@ def create_observation_bt_resource(adp,patient_bundle,encounter_bundle,i):
                 }
         } 
     return bundle_observation_bt_structure
-def create_observation_covid_resource(adp,patient_bundle,encounter_bundle,i):
+def create_observation_covid_resource(adp,patient_bundle,encounter_bundle,i,h_code):
     bundle_observation_covid_structure = dict()
     encounter_resource = dict()
     patient_resource = dict()
@@ -1768,7 +1768,7 @@ def create_observation_covid_resource(adp,patient_bundle,encounter_bundle,i):
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if adp['STATUS1'][i] is not None and len(adp['STATUS1'][i]) > 1:
-        observation_covid_id = str(uuid.uuid4())
+        observation_covid_id = f"hcode-{h_code}-covid-{patient_resource['id']}"
         observation_covid_resource = {
           "resourceType": "Observation",
           "id": observation_covid_id,
@@ -1825,7 +1825,7 @@ def create_observation_covid_resource(adp,patient_bundle,encounter_bundle,i):
                 }
         }
     return bundle_observation_covid_structure
-def create_observation_dcip_resource(adp,patient_bundle,encounter_bundle,i):
+def create_observation_dcip_resource(adp,patient_bundle,encounter_bundle,i,h_code):
     bundle_observation_dcip_structure = dict()
     encounter_resource = dict()
     patient_resource = dict()
@@ -1834,7 +1834,7 @@ def create_observation_dcip_resource(adp,patient_bundle,encounter_bundle,i):
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if adp['DCIP'][i] is not None and len(adp['DCIP'][i]) > 1:
-        observation_dcip_id = str(uuid.uuid4())
+        observation_dcip_id = f"hcode-{h_code}-dcip-{patient_resource['id']}"
         observation_dcip_resource = {
           "resourceType": "Observation",
           "id": observation_dcip_id,
@@ -1901,7 +1901,7 @@ def create_observation_dcip_resource(adp,patient_bundle,encounter_bundle,i):
                 }
         }
     return bundle_observation_dcip_structure
-def create_observation_ga_resource(adp,patient_bundle,encounter_bundle,i):
+def create_observation_ga_resource(adp,patient_bundle,encounter_bundle,i,h_code):
     bundle_observation_ga_structure = dict()
     encounter_resource = dict()
     patient_resource = dict()
@@ -1910,7 +1910,7 @@ def create_observation_ga_resource(adp,patient_bundle,encounter_bundle,i):
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if adp['GA_WEEK'][i] is not None and len(adp['GA_WEEK'][i]) > 1:
-        observation_ga_id = str(uuid.uuid4())
+        observation_ga_id = f"hcode-{h_code}-ga-{patient_resource['id']}"
         observation_gestational_resource = {
           "resourceType": "Observation",
           "id": observation_ga_id,
@@ -1969,7 +1969,7 @@ def create_observation_ga_resource(adp,patient_bundle,encounter_bundle,i):
                 }
         }
     return bundle_observation_ga_structure
-def create_observation_gravida_resource(adp,patient_bundle,encounter_bundle,i):
+def create_observation_gravida_resource(adp,patient_bundle,encounter_bundle,i,h_code):
     bundle_observation_gravida_structure = dict()
     encounter_resource = dict()
     patient_resource = dict()
@@ -1978,7 +1978,7 @@ def create_observation_gravida_resource(adp,patient_bundle,encounter_bundle,i):
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if adp['GRAVIDA'][i] is not None and len(adp['GRAVIDA'][i]) > 1:
-        observation_gravida_id = str(uuid.uuid4())
+        observation_gravida_id = f"hcode-{h_code}-gravida-{patient_resource['id']}"
         observation_gravida_resource = {
           "resourceType": "Observation",
           "id": observation_gravida_id,
@@ -2032,7 +2032,7 @@ def create_observation_gravida_resource(adp,patient_bundle,encounter_bundle,i):
                 }
         }
     return bundle_observation_gravida_structure
-def create_observation_lab_resource(labfu,patient_bundle,encounter_bundle):
+def create_observation_lab_resource(labfu,patient_bundle,encounter_bundle,h_code):
     bundle_observation_labfu_structure = dict()
     encounter_resource = dict()
     patient_resource = dict()
@@ -2041,7 +2041,7 @@ def create_observation_lab_resource(labfu,patient_bundle,encounter_bundle):
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if labfu.shape[0] != 0:
-        labfu_id = str(uuid.uuid4())
+        labfu_id = f"hcode-{h_code}-labfu-{patient_resource['id']}"
         labfu_resource = {
           "resourceType": "Observation",
           "id": labfu_id,

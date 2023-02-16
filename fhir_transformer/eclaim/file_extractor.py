@@ -126,7 +126,7 @@ def open_dbf_files(file_path: str,set_files_name: list, slash: str):
             eclaim_17_df.append(frame_csv)
             eclaim_17_name.append(file_name)
         if file_name == 'cha':
-            frame_csv = open_cha_csv(i)
+            frame_csv = open_cha_dbf(i)
             eclaim_17_df.append(frame_csv)
             eclaim_17_name.append(file_name)
         if file_name == 'cht':
