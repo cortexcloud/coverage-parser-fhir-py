@@ -234,12 +234,16 @@ def create_bundle_resource_eclaim(eclaim_17_df,eclaim_17_name,h_code,h_name,os):
         if eclaim_17_name[i] == 'labfu':
             frame_labfu = eclaim_17_df[i]
             frame_labfu.columns = frame_labfu.columns.str.upper()
-    unique_hn = frame_ipd['HN'].unique()
+    # Filter Nan
+    frame_pat = frame_pat[~frame_pat['PERSON_ID'].isna()]
+    unique_pat_hn = frame_pat['HN'].unique()
+    frame_ipd = frame_ipd[frame_ipd.HN.isin(unique_pat_hn)]
+    unique_ipd_hn = frame_ipd['HN'].unique()
     # init array bundle & dict
     entry = []
     hcode_id = "hcode" + str(h_code)
     # create resource
-    for hn in unique_hn:
+    for hn in unique_ipd_hn:
         bundle_resource = []
         claim = []
         ins = filter_visit_hn(frame_ins,hn)
@@ -282,11 +286,11 @@ def create_bundle_resource_eclaim(eclaim_17_df,eclaim_17_name,h_code,h_name,os):
         bundle_med_req_structure_arr = create_medication_request_resource(dru,bundle_patient_structure,bundle_encounter_structure)
         # Create Claim Resource
         claim_items = create_claim_item(cha,adp,dru,bundle_encounter_structure)
-        bundle_claim_structure = create_claim_resource(cha,claim_items,bundle_patient_structure,bundle_encounter_structure,hcode_id)              
+        bundle_claim_structure = create_claim_resource(cha,claim_items,bundle_patient_structure,bundle_encounter_structure,h_code)              
         # Update Claim Resource By (CHT)
-        bundle_claim_structure = update_claim_resource_by_cht(cht,bundle_claim_structure)
+        bundle_claim_structure = update_claim_resource_by_cht(cht,bundle_claim_structure,bundle_patient_structure,bundle_encounter_structure,h_code)
         # Update Claim & Service Request By (AER)
-        bundle_claim_structure= update_claim_resource_by_aer(aer,bundle_claim_structure)
+        bundle_claim_structure= update_claim_resource_by_aer(aer,bundle_claim_structure,bundle_patient_structure,bundle_encounter_structure,h_code)
         bundle_service_req_structure = update_service_request_resource_by_aer(aer,irf,bundle_service_req_structure)
         # Create Observation & Condition By (ADP)
         if adp.shape[0] != 0:
@@ -450,7 +454,7 @@ def create_coverage_resource(ins,h_code):
           }
       if ins.iloc[0]['CID'] is not None and len(str(ins.iloc[0]['CID'])) > 0:
           coverage_resource["beneficiary"] = {
-              "reference" : f"Patient/cid{ins.iloc[0]['CID']}",
+              "reference" : f"Patient/cid-{ins.iloc[0]['CID']}",
               "identifier" : {
                 "system" : "https://terms.sil-th.org/id/th-cid",
                 "value" : ins.iloc[0]['CID']
@@ -528,7 +532,7 @@ def create_patient_resource(pat,h_code):
                   ]
                 },
                 "system": "https://terms.sil-th.org/id/th-cid",
-                "value": str(int(pat.iloc[0]['PERSON_ID'])) if pat.iloc[0]['PERSON_ID'] is not None else 'None' 
+                "value": pat.iloc[0]['PERSON_ID']
               })
       if pat.iloc[0]['HN'] is not None and len(str(pat.iloc[0]['HN'])) > 0:
           if "identifier" not in patient_resource:
@@ -626,7 +630,7 @@ def create_patient_resource(pat,h_code):
               }
       }
       if pat.iloc[0]['OCCUPA'] is not None and len(str(pat.iloc[0]['OCCUPA'])) > 0:
-          observation_id = f"hcode-{h_code}-occup-cid-{pat.iloc[0]['PERSON_ID']}"
+          observation_id = f"hcode-{h_code}-code-11341-5-cid-{pat.iloc[0]['PERSON_ID']}"
           observation_resource = {
                 "resourceType": "Observation",
                 "id": observation_id,
@@ -664,7 +668,7 @@ def create_patient_resource(pat,h_code):
                       ]
                     },
                     "system": "https://terms.sil-th.org/id/th-cid",
-                    "value": str(int(pat.iloc[0]['PERSON_ID']))
+                    "value": pat.iloc[0]['PERSON_ID']
                   }
                 },
                 "valueCodeableConcept": {
@@ -813,7 +817,7 @@ def create_encounter_resource(ipd,bundle_patient_structure,h_code):
                 ]
               }
             })
-      if ipd.iloc[0]['DISCHT'] is not None and len(str(ipd.iloc[0]['DISCHT'])) > 0:
+      if ipd.iloc[0]['DISCHT'] is not None and len(str(ipd.iloc[0]['DISCHT'])) > 0 and str(ipd.iloc[0]['DISCHT']) in discht_dict:
           if "hospitalization" not in encounter_resource:
               encounter_resource["hospitalization"] = dict()
               encounter_resource["hospitalization"]["extension"] = []
@@ -883,7 +887,7 @@ def create_encounter_resource(ipd,bundle_patient_structure,h_code):
                   }
                 }
               })
-      observation_bw_id = f"hcode-{h_code}-bw-{patient_resource['id']}"
+      observation_bw_id = f"hcode-{h_code}-code-29463-7-{patient_resource['id']}"
       observation_bw_resource = {
           "resourceType": "Observation",
           "id": observation_bw_id,
@@ -1361,7 +1365,7 @@ def create_medication_request_resource(dru,patient_bundle,encounter_bundle):
                       "reference": f"Patient/{str(patient_resource['id'])}",
                       "identifier": {
                         "system": "https://terms.sil-th.org/id/th-cid",
-                        "value": str(int(dru['PERSON_ID'][i]))
+                        "value": dru['PERSON_ID'][i]
                       }
                   }
           if len(encounter_resource) > 0:
@@ -1563,7 +1567,7 @@ def create_claim_item(cha,adp,dru,encounter_bundle):
                           claim_item['detail'].append(item)
           claim_items.append(claim_item)                  
     return claim_items
-def create_claim_resource(cha,claim_items,patient_bundle,encounter_bundle,hcode_id):
+def create_claim_resource(cha,claim_items,patient_bundle,encounter_bundle,h_code):
     bundle_claim_structure = dict()
     encounter_resource = dict()
     patient_resource = dict()
@@ -1573,6 +1577,7 @@ def create_claim_resource(cha,claim_items,patient_bundle,encounter_bundle,hcode_
         patient_resource = patient_bundle['resource']
     if len(claim_items) > 0:
       claim_id = f"{encounter_resource['id']}"
+      # type status use provider priority patient created   insurance 
       claim_resource = {
         "resourceType": "Claim",
         "id": claim_id,
@@ -1589,7 +1594,7 @@ def create_claim_resource(cha,claim_items,patient_bundle,encounter_bundle,hcode_
         }
       claim_resource['use'] = "claim"
       claim_resource['provider'] = {
-          "reference": f"Organization/{hcode_id}"
+          "reference": f"Organization/hcode-{h_code}"
         }
       claim_resource['priority'] = {
           "coding": [
@@ -1605,7 +1610,7 @@ def create_claim_resource(cha,claim_items,patient_bundle,encounter_bundle,hcode_
                 "reference": f"Patient/{str(patient_resource['id'])}",
                 "identifier": {
                   "system": "https://terms.sil-th.org/id/th-cid",
-                  "value": str(int(cha.iloc[0]['PERSON_ID']))
+                  "value": cha.iloc[0]['PERSON_ID']
                 }
               }
       if cha.iloc[0]['DATE'] is not None:
@@ -1616,7 +1621,7 @@ def create_claim_resource(cha,claim_items,patient_bundle,encounter_bundle,hcode_
                 "sequence": 1,
                 "focal": True,
                 "coverage": {
-                  "reference": f"Coverage/uccid{str(int(cha.iloc[0]['PERSON_ID']))}"
+                  "reference": f"Coverage/hcode-{h_code}-uc-cid-{str(cha.iloc[0]['PERSON_ID'])}"
                 }
               }
             ]
@@ -1700,7 +1705,7 @@ def create_observation_bt_resource(adp,patient_bundle,encounter_bundle,i,h_code)
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if adp['BI'][i] is not None and len(adp['BI'][i]) > 1:
-        observation_barthel_id = f"hcode-{h_code}-bt-{patient_resource['id']}"
+        observation_barthel_id = f"hcode-{h_code}-code-96761-2-{patient_resource['id']}"
         observation_barthel_resource = {
           "resourceType": "Observation",
           "id": observation_barthel_id,
@@ -1768,7 +1773,7 @@ def create_observation_covid_resource(adp,patient_bundle,encounter_bundle,i,h_co
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if adp['STATUS1'][i] is not None and len(adp['STATUS1'][i]) > 1:
-        observation_covid_id = f"hcode-{h_code}-covid-{patient_resource['id']}"
+        observation_covid_id = f"hcode-{h_code}-code-871562009-{patient_resource['id']}"
         observation_covid_resource = {
           "resourceType": "Observation",
           "id": observation_covid_id,
@@ -1834,7 +1839,7 @@ def create_observation_dcip_resource(adp,patient_bundle,encounter_bundle,i,h_cod
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if adp['DCIP'][i] is not None and len(adp['DCIP'][i]) > 1:
-        observation_dcip_id = f"hcode-{h_code}-dcip-{patient_resource['id']}"
+        observation_dcip_id = f"hcode-{h_code}-code-300058-{patient_resource['id']}"
         observation_dcip_resource = {
           "resourceType": "Observation",
           "id": observation_dcip_id,
@@ -1910,7 +1915,7 @@ def create_observation_ga_resource(adp,patient_bundle,encounter_bundle,i,h_code)
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if adp['GA_WEEK'][i] is not None and len(adp['GA_WEEK'][i]) > 1:
-        observation_ga_id = f"hcode-{h_code}-ga-{patient_resource['id']}"
+        observation_ga_id = f"hcode-{h_code}-code-57714-8-{patient_resource['id']}"
         observation_gestational_resource = {
           "resourceType": "Observation",
           "id": observation_ga_id,
@@ -1978,7 +1983,7 @@ def create_observation_gravida_resource(adp,patient_bundle,encounter_bundle,i,h_
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if adp['GRAVIDA'][i] is not None and len(adp['GRAVIDA'][i]) > 1:
-        observation_gravida_id = f"hcode-{h_code}-gravida-{patient_resource['id']}"
+        observation_gravida_id = f"hcode-{h_code}-code-11996-6-{patient_resource['id']}"
         observation_gravida_resource = {
           "resourceType": "Observation",
           "id": observation_gravida_id,
@@ -2041,7 +2046,7 @@ def create_observation_lab_resource(labfu,patient_bundle,encounter_bundle,h_code
     if 'resource' in patient_bundle:
         patient_resource = patient_bundle['resource']
     if labfu.shape[0] != 0:
-        labfu_id = f"hcode-{h_code}-labfu-{patient_resource['id']}"
+        labfu_id = f"hcode-{h_code}-code-01-{patient_resource['id']}"
         labfu_resource = {
           "resourceType": "Observation",
           "id": labfu_id,
@@ -2236,24 +2241,71 @@ def update_encounter_by_dru(dru,encounter_resource):
                     ]
         }
     return encounter_resource
-def update_claim_resource_by_cht(cht,claim_bundle):
+def update_claim_resource_by_cht(cht,claim_bundle,patient_bundle,encounter_bundle,h_code):
     claim_resource = dict()
+    encounter_resource = dict()
+    patient_resource = dict()
+    if 'resource' in encounter_bundle:
+        encounter_resource = encounter_bundle['resource']
+    if 'resource' in patient_bundle:
+        patient_resource = patient_bundle['resource']
     if 'resource' in claim_bundle:
         claim_resource = claim_bundle['resource']
     if cht.shape[0] != 0:
       if len(claim_resource) == 0:
-          claim_id = str(uuid.uuid4())
+          claim_id = f"{encounter_resource['id']}"
           claim_resource = {
             "resourceType": "Claim",
-            "id": claim_id
+            "id": claim_id,
+            "status": "active"
           }
+          claim_resource['type'] = {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/claim-type",
+                  "code": "institutional"
+                }
+              ]
+            }
+          claim_resource['use'] = "claim"
+          claim_resource['provider'] = {
+              "reference": f"Organization/hcode-{h_code}"
+            }
+          claim_resource['priority'] = {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/processpriority",
+                  "code": "normal"
+                }
+              ]
+            }
+          if cht.iloc[0]['PERSON_ID'] is not None and len(cht.iloc[0]['PERSON_ID']) > 0:
+            claim_resource['patient'] = {
+                "reference": f"Patient/{str(patient_resource['id'])}",
+                "identifier": {
+                  "system": "https://terms.sil-th.org/id/th-cid",
+                  "value": cht.iloc[0]['PERSON_ID']
+                }
+              }
+          if cht.iloc[0]['DATE'] is not None:
+              claim_resource['created'] = str(cht.iloc[0]['DATE'])+"T17:00:00+07:00" 
+          if cht.iloc[0]['PERSON_ID'] is not None and len(cht.iloc[0]['PERSON_ID']) > 0:
+              claim_resource['insurance'] = [
+                  {
+                    "sequence": 1,
+                    "focal": True,
+                    "coverage": {
+                      "reference": f"Coverage/hcode-{h_code}-uc-cid-{cht.iloc[0]['PERSON_ID']}"
+                    }
+                  }
+                ]
           claim_bundle['resource'] = claim_resource
       if cht.iloc[0]['PAID'] is not None:
           claim_resource['extension'] = [
               {
                 "url": "https://fhir-ig.sil-th.org/extensions/StructureDefinition/ex-claim-total-paid",
                 "valueMoney": {
-                  "value": cht.iloc[0]['PAID'],
+                  "value": float(cht.iloc[0]['PAID']),
                   "currency": "THB"
                 }
               }
@@ -2307,21 +2359,68 @@ def update_claim_resource_by_cht(cht,claim_bundle):
             ]
       if cht.iloc[0]['TOTAL'] is not None:
           claim_resource['total'] = {
-              "value": cht.iloc[0]['TOTAL'],
+              "value": float(cht.iloc[0]['TOTAL']),
               "currency": "THB"
             }
     return claim_bundle
-def update_claim_resource_by_aer(aer,claim_bundle):
+def update_claim_resource_by_aer(aer,claim_bundle,patient_bundle,encounter_bundle,h_code):
     claim_resource = dict()
+    encounter_resource = dict()
+    patient_resource = dict()
+    if 'resource' in encounter_bundle:
+        encounter_resource = encounter_bundle['resource']
+    if 'resource' in patient_bundle:
+        patient_resource = patient_bundle['resource']
     if 'resource' in claim_bundle:
         claim_resource = claim_bundle['resource']
     if aer.shape[0] != 0:
       if len(claim_resource) == 0:
-          claim_id = str(uuid.uuid4())
+          claim_id = f"{encounter_resource['id']}"
           claim_resource = {
             "resourceType": "Claim",
-            "id": claim_id
+            "id": claim_id,
+            "status": "active"
           }
+          claim_resource['type'] = {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/claim-type",
+                  "code": "institutional"
+                }
+              ]
+            }
+          claim_resource['use'] = "claim"
+          claim_resource['provider'] = {
+              "reference": f"Organization/hcode-{h_code}"
+            }
+          claim_resource['priority'] = {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/processpriority",
+                  "code": "normal"
+                }
+              ]
+            }
+          if aer.iloc[0]['CID'] is not None and len(aer.iloc[0]['CID']) > 0:
+            claim_resource['patient'] = {
+                "reference": f"Patient/{str(patient_resource['id'])}",
+                "identifier": {
+                  "system": "https://terms.sil-th.org/id/th-cid",
+                  "value": aer.iloc[0]['CID']
+                }
+              }
+          if aer.iloc[0]['DATEEXP'] is not None:
+              claim_resource['created'] = str(aer.iloc[0]['DATEEXP'])+"T17:00:00+07:00" 
+          if aer.iloc[0]['CID'] is not None and len(aer.iloc[0]['CID']) > 0:
+              claim_resource['insurance'] = [
+                  {
+                    "sequence": 1,
+                    "focal": True,
+                    "coverage": {
+                      "reference": f"Coverage/hcode-{h_code}-uc-cid-{aer.iloc[0]['CID']}"
+                    }
+                  }
+                ]
           claim_bundle['resource'] = claim_resource
       if aer.iloc[0]['REFER_NO'] is not None:
           claim_resource['referral'] = {
@@ -2343,7 +2442,7 @@ def update_claim_resource_by_aer(aer,claim_bundle):
               ]
             },
             "valueReference": {
-              "reference": f"Encounter/an{str(aer.iloc[0]['AN'])}"
+              "reference": f"Encounter/{encounter_resource['id']}"
             }
           })
       else:
@@ -2359,7 +2458,7 @@ def update_claim_resource_by_aer(aer,claim_bundle):
               ]
             },
             "valueReference": {
-              "reference": f"Encounter/an{str(aer.iloc[0]['AN'])}"
+              "reference": f"Encounter/{encounter_resource['id']}"
             }
           }]
       if 'insurance' in claim_resource:

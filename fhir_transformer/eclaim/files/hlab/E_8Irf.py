@@ -23,7 +23,7 @@ def validate_rows_in_files(df,val_columns):
     df = df.replace(np.nan, None)
     return df
 def open_irf_csv(file_path: PathLike):
-    df = pd.read_csv(file_path, encoding="utf8", delimiter="|",dtype=str,index_col=0)
+    df = pd.read_csv(file_path, encoding="utf8", delimiter="|",dtype=str)
     df.columns = df.columns.str.lower()
     df = validate_rows_in_files(df,IrfRow.get_arr_from_rows())
     return df
